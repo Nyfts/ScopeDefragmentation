@@ -1,0 +1,30 @@
+2020-09-17 10:30:54,742  INFO - ---------------------------------------------------------------------------------
+ 2020-09-17 10:30:54,750  INFO - DESFRAGMENTAÇÃO DE TABELAS DO BANCO DE DADOS DO X3
+ 2020-09-17 10:30:54,752  INFO - INICIO: “09/17/2020 13:30:54”
+ 2020-09-17 10:30:54,752  INFO - ---------------------------------------------------------------------------------
+ 2020-09-17 10:30:54,815  INFO - Executando select c/ todas as tabelas e fragmentação
+ 2020-09-17 10:30:54,821 TRACE - Abrindo conexão
+ 2020-09-17 10:31:09,934 ERROR - System.Data.SqlClient.SqlException (0x80131904): A network-related or instance-specific error occurred while establishing a connection to SQL Server. The server was not found or was not accessible. Verify that the instance name is correct and that SQL Server is configured to allow remote connections. (provider: Named Pipes Provider, error: 40 - Could not open a connection to SQL Server)
+ ---> System.ComponentModel.Win32Exception (53): O caminho da rede não foi encontrado.
+   at System.Data.SqlClient.SqlInternalConnectionTds..ctor(DbConnectionPoolIdentity identity, SqlConnectionString connectionOptions, SqlCredential credential, Object providerInfo, String newPassword, SecureString newSecurePassword, Boolean redirectedUserInstance, SqlConnectionString userConnectionOptions, SessionData reconnectSessionData, Boolean applyTransientFaultHandling, String accessToken)
+   at System.Data.SqlClient.SqlConnectionFactory.CreateConnection(DbConnectionOptions options, DbConnectionPoolKey poolKey, Object poolGroupProviderInfo, DbConnectionPool pool, DbConnection owningConnection, DbConnectionOptions userOptions)
+   at System.Data.ProviderBase.DbConnectionFactory.CreatePooledConnection(DbConnectionPool pool, DbConnection owningObject, DbConnectionOptions options, DbConnectionPoolKey poolKey, DbConnectionOptions userOptions)
+   at System.Data.ProviderBase.DbConnectionPool.CreateObject(DbConnection owningObject, DbConnectionOptions userOptions, DbConnectionInternal oldConnection)
+   at System.Data.ProviderBase.DbConnectionPool.UserCreateRequest(DbConnection owningObject, DbConnectionOptions userOptions, DbConnectionInternal oldConnection)
+   at System.Data.ProviderBase.DbConnectionPool.TryGetConnection(DbConnection owningObject, UInt32 waitForMultipleObjectsTimeout, Boolean allowCreate, Boolean onlyOneCheckConnection, DbConnectionOptions userOptions, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionPool.TryGetConnection(DbConnection owningObject, TaskCompletionSource`1 retry, DbConnectionOptions userOptions, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionFactory.TryGetConnection(DbConnection owningConnection, TaskCompletionSource`1 retry, DbConnectionOptions userOptions, DbConnectionInternal oldConnection, DbConnectionInternal& connection)
+   at System.Data.ProviderBase.DbConnectionInternal.TryOpenConnectionInternal(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.ProviderBase.DbConnectionClosed.TryOpenConnection(DbConnection outerConnection, DbConnectionFactory connectionFactory, TaskCompletionSource`1 retry, DbConnectionOptions userOptions)
+   at System.Data.SqlClient.SqlConnection.TryOpen(TaskCompletionSource`1 retry)
+   at System.Data.SqlClient.SqlConnection.Open()
+   at Application.ExecSql(String SqlCommand) in C:\Users\Luan\Desktop\Internet Explorer\ScopeDefragmentation\Application.cs:line 250
+   at Application.MainTask() in C:\Users\Luan\Desktop\Internet Explorer\ScopeDefragmentation\Application.cs:line 73
+ClientConnectionId:00000000-0000-0000-0000-000000000000
+Error Number:53,State:0,Class:20
+ 2020-09-17 10:31:09,959  INFO - ---------------------------------------------------------------------------------
+ 2020-09-17 10:31:09,959  INFO - DESFRAGMENTAÇÃO DE TABELAS DO BANCO DE DADOS DO X3,
+ 2020-09-17 10:31:09,960  INFO - TÉRMINO: “09/17/2020 13:31:09“
+ 2020-09-17 10:31:09,961  INFO - ---------------------------------------------------------------------------------
+
+ 
