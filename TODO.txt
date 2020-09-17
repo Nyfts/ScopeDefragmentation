@@ -1,0 +1,22 @@
+0 - novas  opções
+
+(parametros)
+percentual de fragmentação a partir do qual a tabela deve ser fragmentada >1
+minimo de paginas para ser fragmentadas > 0
+numero minimo de paginas da tabela >=1 / >= <=||>
+ao trazer as tabelas para desfragmentar processar do maior numero de paginas para o menor
+
+(gravar parametros no log)
+
+
+OK 1- fazer lock table em modo esclusive mode para depois fazer a criacao e eliminalçaõ do indice cluster
+(caso de erro ao fazer lock, gravar tabela no log com o nome da tabela e o erro (mens: não foi possivel bloquear tabela))
+
+OK 2-verificar se ja existe indice clusterizado
+OK 2.2 - se ja exisitir  o indice clusterizado, bloqueia tabela, exclui e recria o mesmo e não dropa no final
+
+OK 3 - caso não haja indice clusterizado,
+OK 3.1 pega dados do primeiro indice que não seja rowid e cria um indice clusterizado com outro nome e dropa no final. 
+OK 3.2 grava  o nome da tabela no log (opcional: /debug)
+
+OK 4 - desbloqueia a tabela no final
