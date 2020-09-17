@@ -3,7 +3,6 @@ using System.Data.SqlClient;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using System;
-using System.Threading;
 using System.Data;
 
 public class Application
@@ -14,6 +13,7 @@ public class Application
   private readonly int _minFrag;
   private readonly int _minPag;
   private readonly int _maxPag;
+  private readonly string _tableName;
 
   public Application(ILogger<Application> logger)
   {
@@ -35,6 +35,11 @@ public class Application
     // Default = -1 (sem limite)
     _maxPag = -1;
 
+    // Nome da tabela a ser desfragmentada
+    // Se o valor desse parâmetro não for uma string vazia, todos os outros parâmetros são descartados.
+    // Default = ""
+    _tableName = "";
+
     // Pega Connection String de appsettings.json e armazena em ConnString
     var builder = new ConfigurationBuilder().AddJsonFile("appsettings.json");
 
@@ -45,7 +50,7 @@ public class Application
   internal void Run()
   {
     _logger.LogInformation("---------------------------------------------------------------------------------");
-    _logger.LogInformation("DEFRAGMENTAÇÃO DE TABELAS DO BANCO DE DADOS DO X3");
+    _logger.LogInformation("DESFRAGMENTAÇÃO DE TABELAS DO BANCO DE DADOS DO X3");
     _logger.LogInformation("INICIO: “{0}”", DateTime.UtcNow);
     _logger.LogInformation("---------------------------------------------------------------------------------");
 
@@ -53,7 +58,7 @@ public class Application
     MainTask();
 
     _logger.LogInformation("---------------------------------------------------------------------------------");
-    _logger.LogInformation("DEFRAGMENTAÇÃO DE TABELAS DO BANCO DE DADOS DO X3,");
+    _logger.LogInformation("DESFRAGMENTAÇÃO DE TABELAS DO BANCO DE DADOS DO X3,");
     _logger.LogInformation("TÉRMINO: “{0}“", DateTime.UtcNow);
     _logger.LogInformation("---------------------------------------------------------------------------------\n");
   }
@@ -65,24 +70,48 @@ public class Application
       // Monta select no banco para selecionar todas as tabelas ordenadas pela fragmentação desc
       StringBuilder sb = new StringBuilder();
 
-      sb.Append("SELECT dbschemas.[name] as 'Schema',\n");
-      sb.Append("dbtables.[name] as 'Table',\n");
-      sb.Append("indexstats.page_count,\n");
-      sb.Append("indexstats.avg_fragmentation_in_percent\n");
-      sb.Append("FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, NULL) AS indexstats\n");
-      sb.Append("INNER JOIN sys.tables dbtables on dbtables.[object_id] = indexstats.[object_id]\n");
-      sb.Append("INNER JOIN sys.schemas dbschemas on dbtables.[schema_id] = dbschemas.[schema_id]\n");
-      sb.Append("INNER JOIN sys.indexes AS dbindexes ON dbindexes.[object_id] = indexstats.[object_id]\n");
-      sb.Append("AND indexstats.index_id = dbindexes.index_id\n");
-      sb.Append("WHERE indexstats.database_id = DB_ID() AND indexstats.page_count >= " + _minPag.ToString() + " \n");
 
-      if (_maxPag > 0)
+      if (_tableName == "")
       {
-        sb.Append("AND indexstats.page_count <= " + _maxPag.ToString() + " \n");
+        // Se não passar o nome da tabela usa os outros parâmetros
+        sb.Append("SELECT dbschemas.[name] as 'Schema',\n");
+        sb.Append("dbtables.[name] as 'Table',\n");
+        sb.Append("indexstats.page_count,\n");
+        sb.Append("indexstats.avg_fragmentation_in_percent\n");
+        sb.Append("FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, NULL) AS indexstats\n");
+        sb.Append("INNER JOIN sys.tables dbtables on dbtables.[object_id] = indexstats.[object_id]\n");
+        sb.Append("INNER JOIN sys.schemas dbschemas on dbtables.[schema_id] = dbschemas.[schema_id]\n");
+        sb.Append("INNER JOIN sys.indexes AS dbindexes ON dbindexes.[object_id] = indexstats.[object_id]\n");
+        sb.Append("AND indexstats.index_id = dbindexes.index_id\n");
+        sb.Append("WHERE indexstats.database_id = DB_ID() AND indexstats.page_count >= " + _minPag.ToString() + " \n");
+
+        if (_maxPag > 0)
+        {
+          sb.Append("AND indexstats.page_count <= " + _maxPag.ToString() + " \n");
+        }
+
+        sb.Append("GROUP BY dbschemas.[name], dbtables.[name], indexstats.page_count, indexstats.avg_fragmentation_in_percent\n");
+        sb.Append("ORDER BY indexstats.page_count desc\n");
+      }
+      else
+      {
+        // Filtra pelo nome da tabela
+
+        sb.Append("SELECT dbschemas.[name] as 'Schema',\n");
+        sb.Append("dbtables.[name] as 'Table',\n");
+        sb.Append("indexstats.page_count,\n");
+        sb.Append("indexstats.avg_fragmentation_in_percent\n");
+        sb.Append("FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, NULL) AS indexstats\n");
+        sb.Append("INNER JOIN sys.tables dbtables on dbtables.[object_id] = indexstats.[object_id]\n");
+        sb.Append("INNER JOIN sys.schemas dbschemas on dbtables.[schema_id] = dbschemas.[schema_id]\n");
+        sb.Append("INNER JOIN sys.indexes AS dbindexes ON dbindexes.[object_id] = indexstats.[object_id]\n");
+        sb.Append("AND indexstats.index_id = dbindexes.index_id\n");
+        sb.Append("WHERE indexstats.database_id = DB_ID() AND dbtables.[name] = '" + _tableName + "'\n");
+        sb.Append("GROUP BY dbschemas.[name], dbtables.[name], indexstats.page_count, indexstats.avg_fragmentation_in_percent\n");
+        sb.Append("ORDER BY indexstats.page_count desc\n");
       }
 
-      sb.Append("GROUP BY dbschemas.[name], dbtables.[name], indexstats.page_count, indexstats.avg_fragmentation_in_percent\n");
-      sb.Append("ORDER BY indexstats.page_count desc\n");
+      
 
       string sql = sb.ToString();
 
