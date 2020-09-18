@@ -279,67 +279,68 @@ public class Application
 
     // Aqui começa a transação
 
-    var conn = new SqlConnection(_connString);
-
-    logDebug("Abrindo conexão");
-    conn.Open();
-
-    SqlCommand command = conn.CreateCommand();
-    SqlTransaction transaction = conn.BeginTransaction(IsolationLevel.Serializable, "ScCDI-" + newIndexName);
-
-    command.Connection = conn;
-    command.Transaction = transaction;
-
-    try
+    using (var conn = new SqlConnection(_connString))
     {
-      logDebug("Criando índice cluster");
+      logDebug("Abrindo conexão");
+      conn.Open();
 
-      StringBuilder createIndexSql = new StringBuilder();
+      SqlCommand command = conn.CreateCommand();
+      SqlTransaction transaction = conn.BeginTransaction(IsolationLevel.Serializable, "ScCDI-" + newIndexName);
 
-      createIndexSql.Append("CREATE CLUSTERED INDEX " + newIndexName);
-      createIndexSql.Append("\nON " + tableName + "(" + selectedColumns + ")");
+      command.Connection = conn;
+      command.Transaction = transaction;
 
-      command.CommandText = createIndexSql.ToString();
-      command.ExecuteNonQuery();
-
-      logDebug("Índice criado");
-
-      logDebug("Dropando índice cluster");
-
-      StringBuilder dropIndexSql = new StringBuilder();
-
-      dropIndexSql.Append("DROP INDEX " + newIndexName + " ON " + tableName);
-
-      command.CommandText = dropIndexSql.ToString();
-      command.ExecuteNonQuery();
-
-
-      logDebug("Comitando transação");
-      // Attempt to commit the transaction.
-      transaction.Commit();
-      logDebug("Índice cluster derrubado com sucesso.");
-
-      _logger.LogInformation("Tabela: " + tableName + " Desfragmentada");
-
-      return true;
-    }
-    catch (Exception e)
-    {
       try
       {
-        logDebug("Falha durante a transação, iniciando Rollback.");
-        _logger.LogError(e.ToString());
-        transaction.Rollback();
-        return false;
+        logDebug("Criando índice cluster");
+
+        StringBuilder createIndexSql = new StringBuilder();
+
+        createIndexSql.Append("CREATE CLUSTERED INDEX " + newIndexName);
+        createIndexSql.Append("\nON " + tableName + "(" + selectedColumns + ")");
+
+        command.CommandText = createIndexSql.ToString();
+        command.ExecuteNonQuery();
+
+        logDebug("Índice criado");
+
+        logDebug("Dropando índice cluster");
+
+        StringBuilder dropIndexSql = new StringBuilder();
+
+        dropIndexSql.Append("DROP INDEX " + newIndexName + " ON " + tableName);
+
+        command.CommandText = dropIndexSql.ToString();
+        command.ExecuteNonQuery();
+
+
+        logDebug("Comitando transação");
+        // Attempt to commit the transaction.
+        transaction.Commit();
+        logDebug("Índice cluster derrubado com sucesso.");
+
+        _logger.LogInformation("Tabela: " + tableName + " Desfragmentada");
+
+        return true;
       }
-      catch (Exception ex2)
+      catch (Exception e)
       {
-        // This catch block will handle any errors that may have occurred
-        // on the server that would cause the rollback to fail, such as
-        // a closed connection.
-        _logger.LogError("Rollback Exception Type: " + ex2.GetType());
-        _logger.LogError("Message: " + ex2.Message);
-        return false;
+        try
+        {
+          logDebug("Falha durante a transação, iniciando Rollback.");
+          _logger.LogError(e.ToString());
+          transaction.Rollback();
+          return false;
+        }
+        catch (Exception ex2)
+        {
+          // This catch block will handle any errors that may have occurred
+          // on the server that would cause the rollback to fail, such as
+          // a closed connection.
+          _logger.LogError("Rollback Exception Type: " + ex2.GetType());
+          _logger.LogError("Message: " + ex2.Message);
+          return false;
+        }
       }
     }
 
@@ -386,63 +387,62 @@ public class Application
 
       // Aqui começa a transação
 
-      var conn = new SqlConnection(_connString);
-
-      logDebug("Abrindo conexão");
-      conn.Open();
-
-      SqlCommand command = conn.CreateCommand();
-      SqlTransaction transaction = conn.BeginTransaction(IsolationLevel.Serializable, "ScREI-" + currentIndexName);
-
-      command.Connection = conn;
-      command.Transaction = transaction;
-
-      try
+      using (var conn = new SqlConnection(_connString))
       {
-        logDebug("Dropando índice cluster");
-        string dropIndexSql = "DROP INDEX " + currentIndexName + " ON " + tableName;
-        command.CommandText = dropIndexSql;
-        command.ExecuteNonQuery();
+        logDebug("Abrindo conexão");
+        conn.Open();
 
-        logDebug("Criando índice cluster");
+        SqlCommand command = conn.CreateCommand();
+        SqlTransaction transaction = conn.BeginTransaction(IsolationLevel.Serializable, "ScREI-" + currentIndexName);
 
-        StringBuilder createIndexSql = new StringBuilder();
+        command.Connection = conn;
+        command.Transaction = transaction;
 
-        createIndexSql.Append("CREATE CLUSTERED INDEX " + currentIndexName);
-        createIndexSql.Append("\nON " + tableName + "(" + currentIndexColumns + ")");
-
-        command.CommandText = createIndexSql.ToString();
-        command.ExecuteNonQuery();
-
-        logDebug("Comitando transação");
-        // Attempt to commit the transaction.
-        transaction.Commit();
-        logDebug("Índice criado");
-
-        _logger.LogInformation("Tabela: " + tableName + " Desfragmentada");
-        return true;
-      }
-      catch (Exception e)
-      {
         try
         {
-          logDebug("Falha durante a transação, iniciando Rollback.");
-          _logger.LogError(e.ToString());
-          transaction.Rollback();
-          return false;
+          logDebug("Dropando índice cluster");
+          string dropIndexSql = "DROP INDEX " + currentIndexName + " ON " + tableName;
+          command.CommandText = dropIndexSql;
+          command.ExecuteNonQuery();
+
+          logDebug("Criando índice cluster");
+
+          StringBuilder createIndexSql = new StringBuilder();
+
+          createIndexSql.Append("CREATE CLUSTERED INDEX " + currentIndexName);
+          createIndexSql.Append("\nON " + tableName + "(" + currentIndexColumns + ")");
+
+          command.CommandText = createIndexSql.ToString();
+          command.ExecuteNonQuery();
+
+          logDebug("Comitando transação");
+          // Attempt to commit the transaction.
+          transaction.Commit();
+          logDebug("Índice criado");
+
+          _logger.LogInformation("Tabela: " + tableName + " Desfragmentada");
+          return true;
         }
-        catch (Exception ex2)
+        catch (Exception e)
         {
-          // This catch block will handle any errors that may have occurred
-          // on the server that would cause the rollback to fail, such as
-          // a closed connection.
-          _logger.LogError("Rollback Exception Type: " + ex2.GetType());
-          _logger.LogError("Message: " + ex2.Message);
-          return false;
+          try
+          {
+            logDebug("Falha durante a transação, iniciando Rollback.");
+            _logger.LogError(e.ToString());
+            transaction.Rollback();
+            return false;
+          }
+          catch (Exception ex2)
+          {
+            // This catch block will handle any errors that may have occurred
+            // on the server that would cause the rollback to fail, such as
+            // a closed connection.
+            _logger.LogError("Rollback Exception Type: " + ex2.GetType());
+            _logger.LogError("Message: " + ex2.Message);
+            return false;
+          }
         }
       }
-
-
       // Aqui termina a transação
     }
     catch (Exception e)
@@ -506,22 +506,22 @@ public class Application
 
   private DataSet ExecSql(string SqlCommand)
   {
-    var ds = new DataSet();
-    var conn = new SqlConnection(_connString);
+    using (var conn = new SqlConnection(_connString))
+    {
+      var ds = new DataSet();
 
-    logDebug("Abrindo conexão");
-    conn.Open();
+      logDebug("Abrindo conexão");
+      conn.Open();
 
-    logDebug("Executando Sql: " + SqlCommand);
-    var command = new SqlCommand(SqlCommand, conn);
+      logDebug("Executando Sql: " + SqlCommand);
+      var command = new SqlCommand(SqlCommand, conn);
 
-    var adapter = new SqlDataAdapter(command);
+      var adapter = new SqlDataAdapter(command);
 
-    adapter.Fill(ds);
+      adapter.Fill(ds);
 
-    logDebug("Fechando Conexão");
-    conn.Close();
-    return ds;
+      return ds;
+    }
   }
 
   private void logDebug(string msg)
