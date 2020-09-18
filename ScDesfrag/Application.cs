@@ -4,24 +4,68 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Data;
-
 public class Application
 {
   private readonly ILogger _logger;
-  private readonly string _connString;
-  private readonly int _debug;
-  private readonly int _minFrag;
-  private readonly int _minPag;
-  private readonly int _maxPag;
-  private readonly string _tableName;
+  private string _connString;
+  private int _debug;
+  private int _minFrag;
+  private int _minPag;
+  private int _maxPag;
+  private string _tableName;
+  private bool _canRun;
 
   public Application(ILogger<Application> logger)
   {
     _logger = logger;
 
+    // Pega Connection String de appsettings.json e armazena em ConnString
+    var builder = new ConfigurationBuilder().AddJsonFile("appsettings.json");
+
+    var configuration = builder.Build();
+    _connString = configuration.GetConnectionString("DataConnection");
+  }
+
+  internal void Run(string[] args)
+  {
+    // Carrega parametros
+    LoadParams(args);
+
+    if (_canRun)
+    {
+
+      _logger.LogInformation("---------------------------------------------------------------------------------");
+      _logger.LogInformation("DESFRAGMENTAÇÃO DE TABELAS DO BANCO DE DADOS DO X3");
+      _logger.LogInformation("INICIO: “{0}”", DateTime.UtcNow);
+      _logger.LogInformation("---------------------------------------------------------------------------------");
+
+      _logger.LogInformation("Parâmetros: ");
+      _logger.LogInformation("  Valor mínimo de fragmentação: " + _minFrag.ToString());
+      _logger.LogInformation("  Valor mínimo de paginação: " + _minPag.ToString());
+      _logger.LogInformation("  Valor máximo de paginação: " + _maxPag.ToString());
+      _logger.LogInformation("  Nome da tabela: " + _tableName);
+      _logger.LogInformation("---------------------------------------------------------------------------------");
+
+      // Executa tarefa principal
+      MainTask();
+
+      _logger.LogInformation("---------------------------------------------------------------------------------");
+      _logger.LogInformation("DESFRAGMENTAÇÃO DE TABELAS DO BANCO DE DADOS DO X3,");
+      _logger.LogInformation("TÉRMINO: “{0}“", DateTime.UtcNow);
+      _logger.LogInformation("---------------------------------------------------------------------------------\n");
+    }
+    else
+    {
+      Console.WriteLine("Por favor, execute via ScopeDesfragmentacao.exe");
+    }
+  }
+
+  private void LoadParams(string[] args)
+  {
+
     // 0 = Não informa logs de debug
     // 1 = Informa logs de debug
-    _debug = 1;
+    _debug = 0;
 
     // Número mínimo de fragmentos da tabela para ser desfragmentada
     // Default = 0
@@ -40,27 +84,34 @@ public class Application
     // Default = ""
     _tableName = "";
 
-    // Pega Connection String de appsettings.json e armazena em ConnString
-    var builder = new ConfigurationBuilder().AddJsonFile("appsettings.json");
+    // Programa só pode ser executado via ScopeDesfragmentacao.exe
+    // Isso é feito sendo obrigatório o parâmetro --secret-key-execute
+    _canRun = false;
 
-    var configuration = builder.Build();
-    _connString = configuration.GetConnectionString("DataConnection");
-  }
+    int debugIndex = Array.IndexOf(args, "--debug");
+    int minFragIndex = Array.IndexOf(args, "--min-frag");
+    int minPagIndex = Array.IndexOf(args, "--min-pag");
+    int maxPagIndex = Array.IndexOf(args, "--max-pag");
+    int tableNameIndex = Array.IndexOf(args, "--table");
+    int canRun = Array.IndexOf(args, "--secret-key-execute");
 
-  internal void Run()
-  {
-    _logger.LogInformation("---------------------------------------------------------------------------------");
-    _logger.LogInformation("DESFRAGMENTAÇÃO DE TABELAS DO BANCO DE DADOS DO X3");
-    _logger.LogInformation("INICIO: “{0}”", DateTime.UtcNow);
-    _logger.LogInformation("---------------------------------------------------------------------------------");
+    if (minFragIndex >= 0)
+      _minFrag = int.Parse(args[minFragIndex + 1]);
 
-    // Executa tarefa principal
-    MainTask();
+    if (minPagIndex >= 0)
+      _minPag = int.Parse(args[minPagIndex + 1]);
 
-    _logger.LogInformation("---------------------------------------------------------------------------------");
-    _logger.LogInformation("DESFRAGMENTAÇÃO DE TABELAS DO BANCO DE DADOS DO X3,");
-    _logger.LogInformation("TÉRMINO: “{0}“", DateTime.UtcNow);
-    _logger.LogInformation("---------------------------------------------------------------------------------\n");
+    if (maxPagIndex >= 0)
+      _maxPag = int.Parse(args[maxPagIndex + 1]);
+
+    if (tableNameIndex >= 0)
+      _tableName = args[tableNameIndex + 1];
+
+    if (debugIndex >= 0)
+      _debug = 1;
+
+    if (canRun >= 0)
+      _canRun = true;
   }
 
   private void MainTask()
@@ -111,7 +162,7 @@ public class Application
         sb.Append("ORDER BY indexstats.page_count desc\n");
       }
 
-      
+
 
       string sql = sb.ToString();
 
@@ -228,71 +279,71 @@ public class Application
 
     // Aqui começa a transação
 
-      var conn = new SqlConnection(_connString);
+    var conn = new SqlConnection(_connString);
 
-      logDebug("Abrindo conexão");
-      conn.Open();
+    logDebug("Abrindo conexão");
+    conn.Open();
 
-      SqlCommand command = conn.CreateCommand();
-      SqlTransaction transaction = conn.BeginTransaction(IsolationLevel.Serializable, "ScCDI-" + newIndexName);
+    SqlCommand command = conn.CreateCommand();
+    SqlTransaction transaction = conn.BeginTransaction(IsolationLevel.Serializable, "ScCDI-" + newIndexName);
 
-      command.Connection = conn;
-      command.Transaction = transaction;
+    command.Connection = conn;
+    command.Transaction = transaction;
 
+    try
+    {
+      logDebug("Criando índice cluster");
+
+      StringBuilder createIndexSql = new StringBuilder();
+
+      createIndexSql.Append("CREATE CLUSTERED INDEX " + newIndexName);
+      createIndexSql.Append("\nON " + tableName + "(" + selectedColumns + ")");
+
+      command.CommandText = createIndexSql.ToString();
+      command.ExecuteNonQuery();
+
+      logDebug("Índice criado");
+
+      logDebug("Dropando índice cluster");
+
+      StringBuilder dropIndexSql = new StringBuilder();
+
+      dropIndexSql.Append("DROP INDEX " + newIndexName + " ON " + tableName);
+
+      command.CommandText = dropIndexSql.ToString();
+      command.ExecuteNonQuery();
+
+
+      logDebug("Comitando transação");
+      // Attempt to commit the transaction.
+      transaction.Commit();
+      logDebug("Índice cluster derrubado com sucesso.");
+
+      _logger.LogInformation("Tabela: " + tableName + " Desfragmentada");
+
+      return true;
+    }
+    catch (Exception e)
+    {
       try
       {
-        logDebug("Criando índice cluster");
-
-        StringBuilder createIndexSql = new StringBuilder();
-
-        createIndexSql.Append("CREATE CLUSTERED INDEX " + newIndexName);
-        createIndexSql.Append("\nON " + tableName + "(" + selectedColumns + ")");
-
-        command.CommandText = createIndexSql.ToString();
-        command.ExecuteNonQuery();
-
-        logDebug("Índice criado");
-
-        logDebug("Dropando índice cluster");
-
-        StringBuilder dropIndexSql = new StringBuilder();
-
-        dropIndexSql.Append("DROP INDEX " + newIndexName + " ON " + tableName);
-
-        command.CommandText = dropIndexSql.ToString();
-        command.ExecuteNonQuery();
-
-
-        logDebug("Comitando transação");
-        // Attempt to commit the transaction.
-        transaction.Commit();
-        logDebug("Índice cluster derrubado com sucesso.");
-
-        _logger.LogInformation("Tabela: " + tableName + " Desfragmentada");
-
-        return true;
+        logDebug("Falha durante a transação, iniciando Rollback.");
+        _logger.LogError(e.ToString());
+        transaction.Rollback();
+        return false;
       }
-      catch (Exception e)
+      catch (Exception ex2)
       {
-        try
-        {
-          logDebug("Falha durante a transação, iniciando Rollback.");
-          _logger.LogError(e.ToString());
-          transaction.Rollback();
-          return false;
-        }
-        catch (Exception ex2)
-        {
-          // This catch block will handle any errors that may have occurred
-          // on the server that would cause the rollback to fail, such as
-          // a closed connection.
-          _logger.LogError("Rollback Exception Type: " + ex2.GetType());
-          _logger.LogError("Message: " + ex2.Message);
-          return false;
-        }
+        // This catch block will handle any errors that may have occurred
+        // on the server that would cause the rollback to fail, such as
+        // a closed connection.
+        _logger.LogError("Rollback Exception Type: " + ex2.GetType());
+        _logger.LogError("Message: " + ex2.Message);
+        return false;
       }
+    }
 
-      // Aqui termina a transação
+    // Aqui termina a transação
 
   }
 
@@ -336,7 +387,7 @@ public class Application
       // Aqui começa a transação
 
       var conn = new SqlConnection(_connString);
-      
+
       logDebug("Abrindo conexão");
       conn.Open();
 
@@ -367,7 +418,7 @@ public class Application
         // Attempt to commit the transaction.
         transaction.Commit();
         logDebug("Índice criado");
-        
+
         _logger.LogInformation("Tabela: " + tableName + " Desfragmentada");
         return true;
       }
