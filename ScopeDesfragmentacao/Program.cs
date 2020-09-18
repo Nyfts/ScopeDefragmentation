@@ -14,6 +14,7 @@ namespace ScopeDesfragmentacao
       int minFragIndex = Array.IndexOf(args, "--min-frag");
       int minPagIndex = Array.IndexOf(args, "--min-pag");
       int maxPagIndex = Array.IndexOf(args, "--max-pag");
+      int schemaIndex = Array.IndexOf(args, "--schema");
       int tableNameIndex = Array.IndexOf(args, "--table");
 
       if (BackgroundIndex < 0 && ForegroundIndex < 0)
@@ -24,6 +25,7 @@ namespace ScopeDesfragmentacao
         Console.WriteLine("Obrigatorio:");
         Console.WriteLine("  --b                         Roda a aplicação background");
         Console.WriteLine("  --f                         Roda a aplicação foreground");
+        Console.WriteLine("  --schema   [valor:string]   Dossier da aplicação");
 
         Console.WriteLine("\nOpcionais:");
         Console.WriteLine("  --min-frag [valor:int]      Valor minimo de fragmentacao da tabela (default = 0)");
@@ -35,11 +37,16 @@ namespace ScopeDesfragmentacao
       {
         try
         {
+
+          if (schemaIndex < 0)
+            throw new Exception("Por favor, informe o schema (dossier)");
+
           // Parâmetros default
-          int minFrag = 0;
-          int minPag = 1;
+          int minFrag = 10;
+          int minPag = 1000;
           int maxPag = -1;
-          String tableName = "";
+          String schema = String.Empty;
+          String tableName = String.Empty;
           int debug = 0;
 
           if (minFragIndex >= 0)
@@ -50,6 +57,9 @@ namespace ScopeDesfragmentacao
 
           if (maxPagIndex >= 0)
             maxPag = int.Parse(args[maxPagIndex + 1]);
+
+          if (schemaIndex >= 0)
+            schema = args[schemaIndex + 1];
 
           if (tableNameIndex >= 0)
             tableName = args[tableNameIndex + 1];
@@ -67,23 +77,24 @@ namespace ScopeDesfragmentacao
 
           bool CreateNoWindow;
 
-          if (BackgroundIndex >= 0)
+          if (ForegroundIndex >= 0)
+          {
+            Console.WriteLine("\nIniciando aplicação foreground...");
+            // Executa foreground
+            CreateNoWindow = false;
+          }
+          else
           {
             Console.WriteLine("\nIniciando aplicação background...");
             // Executa background
             CreateNoWindow = true;
-          }
-          else
-          {
-            Console.WriteLine("\nIniciando aplicação foreground...");
-            // Executa background
-            CreateNoWindow = false;
           }
 
           string arguments = "--secret-key-execute";
           arguments += " --min-frag " + minFrag.ToString();
           arguments += " --min-pag " + minPag.ToString();
           arguments += " --max-pag " + maxPag.ToString();
+          arguments += " --schema \"" + schema + "\"";
           arguments += " --table \"" + tableName + "\"";
           if (debug == 1)
             arguments += " --debug";
@@ -91,15 +102,12 @@ namespace ScopeDesfragmentacao
           using (Process newProcess = new Process())
           {
             newProcess.StartInfo.UseShellExecute = false;
-            // You can start any process, HelloWorld is a do-nothing example.
             newProcess.StartInfo.FileName = "ScDesfrag\\ScDesfrag.exe";
             newProcess.StartInfo.CreateNoWindow = CreateNoWindow;
             newProcess.StartInfo.Arguments = arguments;
+
+            // Inicia processo scDesfrag
             newProcess.Start();
-            // This code assumes the process you are starting will terminate itself.
-            // Given that is is started without a window so you cannot terminate it
-            // on the desktop, it must terminate itself or you can do it programmatically
-            // from this application using the Kill method.
           }
         }
         catch (Exception e)

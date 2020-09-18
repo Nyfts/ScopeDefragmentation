@@ -12,6 +12,7 @@ public class Application
   private int _minFrag;
   private int _minPag;
   private int _maxPag;
+  private string _schema;
   private string _tableName;
   private bool _canRun;
 
@@ -43,6 +44,7 @@ public class Application
       _logger.LogInformation("  Valor mínimo de fragmentação: " + _minFrag.ToString());
       _logger.LogInformation("  Valor mínimo de paginação: " + _minPag.ToString());
       _logger.LogInformation("  Valor máximo de paginação: " + _maxPag.ToString());
+      _logger.LogInformation("  Nome do schema: " + _schema);
       _logger.LogInformation("  Nome da tabela: " + _tableName);
       _logger.LogInformation("---------------------------------------------------------------------------------");
 
@@ -69,20 +71,25 @@ public class Application
 
     // Número mínimo de fragmentos da tabela para ser desfragmentada
     // Default = 0
-    _minFrag = 0;
+    _minFrag = 10;
 
     // Número mínimo de páginas da tabela para ser desfragmentada
     // Default = 1
-    _minPag = 1;
+    _minPag = 1000;
 
     // Número máximo de páginas da tabela para ser desfragmentada
     // Default = -1 (sem limite)
     _maxPag = -1;
 
+    // Nome do Schema do banco de dados a ser processado
+    // Se o valor desse parâmetro for vazio, seleciona todos os schemas
+    // Default = ""
+    _schema = String.Empty;
+
     // Nome da tabela a ser desfragmentada
     // Se o valor desse parâmetro não for uma string vazia, todos os outros parâmetros são descartados.
     // Default = ""
-    _tableName = "";
+    _tableName = String.Empty;
 
     // Programa só pode ser executado via ScopeDesfragmentacao.exe
     // Isso é feito sendo obrigatório o parâmetro --secret-key-execute
@@ -92,6 +99,7 @@ public class Application
     int minFragIndex = Array.IndexOf(args, "--min-frag");
     int minPagIndex = Array.IndexOf(args, "--min-pag");
     int maxPagIndex = Array.IndexOf(args, "--max-pag");
+    int schemaIndex = Array.IndexOf(args, "--schema");
     int tableNameIndex = Array.IndexOf(args, "--table");
     int canRun = Array.IndexOf(args, "--secret-key-execute");
 
@@ -103,6 +111,9 @@ public class Application
 
     if (maxPagIndex >= 0)
       _maxPag = int.Parse(args[maxPagIndex + 1]);
+
+    if (schemaIndex >= 0)
+      _schema = args[schemaIndex + 1];
 
     if (tableNameIndex >= 0)
       _tableName = args[tableNameIndex + 1];
@@ -122,7 +133,7 @@ public class Application
       StringBuilder sb = new StringBuilder();
 
 
-      if (_tableName == "")
+      if (String.IsNullOrEmpty(_tableName))
       {
         // Se não passar o nome da tabela usa os outros parâmetros
         sb.Append("SELECT dbschemas.[name] as 'Schema',\n");
@@ -137,9 +148,11 @@ public class Application
         sb.Append("WHERE indexstats.database_id = DB_ID() AND indexstats.page_count >= " + _minPag.ToString() + " \n");
 
         if (_maxPag > 0)
-        {
           sb.Append("AND indexstats.page_count <= " + _maxPag.ToString() + " \n");
-        }
+
+        if (!(String.IsNullOrEmpty(_schema)))
+          sb.Append("AND dbschemas.[name] like '" + _schema + "' \n");
+
 
         sb.Append("GROUP BY dbschemas.[name], dbtables.[name], indexstats.page_count, indexstats.avg_fragmentation_in_percent\n");
         sb.Append("ORDER BY indexstats.page_count desc\n");
@@ -158,11 +171,13 @@ public class Application
         sb.Append("INNER JOIN sys.indexes AS dbindexes ON dbindexes.[object_id] = indexstats.[object_id]\n");
         sb.Append("AND indexstats.index_id = dbindexes.index_id\n");
         sb.Append("WHERE indexstats.database_id = DB_ID() AND dbtables.[name] = '" + _tableName + "'\n");
+
+        if (!String.IsNullOrEmpty(_schema))
+          sb.Append("AND dbschemas.[name] like '" + _schema + "' \n");
+
         sb.Append("GROUP BY dbschemas.[name], dbtables.[name], indexstats.page_count, indexstats.avg_fragmentation_in_percent\n");
         sb.Append("ORDER BY indexstats.page_count desc\n");
       }
-
-
 
       string sql = sb.ToString();
 
@@ -268,7 +283,7 @@ public class Application
         }
       }
 
-      logDebug("Índice: " + selectedIndex);
+      logDebug("Índice: " + index["index_name"].ToString());
     }
 
     logDebug("Índice utilizado como base: " + selectedIndex);
@@ -313,6 +328,7 @@ public class Application
         command.CommandText = dropIndexSql.ToString();
         command.ExecuteNonQuery();
 
+        logDebug("Indice dropado");
 
         logDebug("Comitando transação");
         // Attempt to commit the transaction.
@@ -405,7 +421,8 @@ public class Application
           command.CommandText = dropIndexSql;
           command.ExecuteNonQuery();
 
-          logDebug("Criando índice cluster");
+          logDebug("Índice dropado");
+          logDebug("Recriando índice cluster");
 
           StringBuilder createIndexSql = new StringBuilder();
 
@@ -414,6 +431,7 @@ public class Application
 
           command.CommandText = createIndexSql.ToString();
           command.ExecuteNonQuery();
+          logDebug("Índice criado");
 
           logDebug("Comitando transação");
           // Attempt to commit the transaction.
@@ -470,15 +488,7 @@ public class Application
     // count > 0, há index cluster
     // count == 0, não há index cluster
 
-    if (count > 0)
-    {
-      return true;
-    }
-    else
-    {
-      return false;
-    }
-
+    return count > 0;
   }
 
   private void VerifyLock(string tableName)
