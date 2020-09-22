@@ -1,4 +1,4 @@
-0 - novas  opções
+OK 0 - novas  opções
 
 (parametros)
 percentual de fragmentação a partir do qual a tabela deve ser fragmentada >1
@@ -20,3 +20,7 @@ OK 3.1 pega dados do primeiro indice que não seja rowid e cria um indice cluste
 OK 3.2 grava  o nome da tabela no log (opcional: /debug)
 
 OK 4 - desbloqueia a tabela no final
+
+OK 5 - deixar os parâmetros --schema e --table case insensitive
+
+OK 6 - arrumado bug quando alguma coluna do indice a ser criado tinha ordenação decrescente

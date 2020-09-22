@@ -4,6 +4,8 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Data;
+using System.Text.RegularExpressions;
+
 public class Application
 {
   private readonly ILogger _logger;
@@ -151,7 +153,7 @@ public class Application
           sb.Append("AND indexstats.page_count <= " + _maxPag.ToString() + " \n");
 
         if (!(String.IsNullOrEmpty(_schema)))
-          sb.Append("AND dbschemas.[name] like '" + _schema + "' \n");
+          sb.Append("AND UPPER(dbschemas.[name]) like '" + _schema.ToUpper() + "' \n");
 
 
         sb.Append("GROUP BY dbschemas.[name], dbtables.[name], indexstats.page_count, indexstats.avg_fragmentation_in_percent\n");
@@ -170,10 +172,10 @@ public class Application
         sb.Append("INNER JOIN sys.schemas dbschemas on dbtables.[schema_id] = dbschemas.[schema_id]\n");
         sb.Append("INNER JOIN sys.indexes AS dbindexes ON dbindexes.[object_id] = indexstats.[object_id]\n");
         sb.Append("AND indexstats.index_id = dbindexes.index_id\n");
-        sb.Append("WHERE indexstats.database_id = DB_ID() AND dbtables.[name] = '" + _tableName + "'\n");
+        sb.Append("WHERE indexstats.database_id = DB_ID() AND UPPER(dbtables.[name]) = '" + _tableName.ToUpper() + "'\n");
 
         if (!String.IsNullOrEmpty(_schema))
-          sb.Append("AND dbschemas.[name] like '" + _schema + "' \n");
+          sb.Append("AND UPPER(dbschemas.[name]) like '" + _schema.ToUpper() + "' \n");
 
         sb.Append("GROUP BY dbschemas.[name], dbtables.[name], indexstats.page_count, indexstats.avg_fragmentation_in_percent\n");
         sb.Append("ORDER BY indexstats.page_count desc\n");
@@ -286,6 +288,8 @@ public class Application
       logDebug("Índice: " + index["index_name"].ToString());
     }
 
+    selectedColumns = Regex.Replace(selectedColumns, @"\(-\)", " DESC");
+
     logDebug("Índice utilizado como base: " + selectedIndex);
     logDebug("Colunas: " + selectedColumns);
 
@@ -314,6 +318,7 @@ public class Application
         createIndexSql.Append("CREATE CLUSTERED INDEX " + newIndexName);
         createIndexSql.Append("\nON " + tableName + "(" + selectedColumns + ")");
 
+        logDebug(createIndexSql.ToString());
         command.CommandText = createIndexSql.ToString();
         command.ExecuteNonQuery();
 
@@ -324,6 +329,8 @@ public class Application
         StringBuilder dropIndexSql = new StringBuilder();
 
         dropIndexSql.Append("DROP INDEX " + newIndexName + " ON " + tableName);
+
+        logDebug(dropIndexSql.ToString());
 
         command.CommandText = dropIndexSql.ToString();
         command.ExecuteNonQuery();
@@ -397,6 +404,8 @@ public class Application
         }
       }
 
+      currentIndexColumns = Regex.Replace(currentIndexColumns, @"\(-\)", " DESC");
+
       logDebug("Índice Cluster: " + currentIndexName);
       logDebug("Colunas: " + currentIndexColumns);
 
@@ -418,6 +427,7 @@ public class Application
         {
           logDebug("Dropando índice cluster");
           string dropIndexSql = "DROP INDEX " + currentIndexName + " ON " + tableName;
+          logDebug(dropIndexSql);
           command.CommandText = dropIndexSql;
           command.ExecuteNonQuery();
 
@@ -428,6 +438,8 @@ public class Application
 
           createIndexSql.Append("CREATE CLUSTERED INDEX " + currentIndexName);
           createIndexSql.Append("\nON " + tableName + "(" + currentIndexColumns + ")");
+
+          logDebug(createIndexSql.ToString());
 
           command.CommandText = createIndexSql.ToString();
           command.ExecuteNonQuery();
