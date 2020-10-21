@@ -160,7 +160,7 @@ public class Application
         sb.Append("ORDER BY indexstats.page_count desc\n");
       }
       else
-      {
+      { 
         // Filtra pelo nome da tabela
 
         sb.Append("SELECT dbschemas.[name] as 'Schema',\n");
@@ -304,7 +304,7 @@ public class Application
       conn.Open();
 
       SqlCommand command = conn.CreateCommand();
-      SqlTransaction transaction = conn.BeginTransaction(IsolationLevel.Serializable, "ScCDI-" + newIndexName);
+      SqlTransaction transaction = conn.BeginTransaction(IsolationLevel.Serializable, "ScIndexCreateDrop");
 
       command.Connection = conn;
       command.Transaction = transaction;
@@ -418,7 +418,7 @@ public class Application
         conn.Open();
 
         SqlCommand command = conn.CreateCommand();
-        SqlTransaction transaction = conn.BeginTransaction(IsolationLevel.Serializable, "ScREI-" + currentIndexName);
+        SqlTransaction transaction = conn.BeginTransaction(IsolationLevel.Serializable, "ScIndexRedo");
 
         command.Connection = conn;
         command.Transaction = transaction;
